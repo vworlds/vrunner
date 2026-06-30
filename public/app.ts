@@ -135,10 +135,7 @@ function renderBranch(app: AppSnapshot, branch: BranchSnapshot): string {
   const status = branch.status ?? "idle";
   const key = `${app.id}:${branch.name}`;
   const isBusy = busy.has(key) || isTransient(status);
-  const canLaunch = ["idle", "error"].includes(status);
-  const canPause = status === "running";
-  const canResume = status === "paused";
-  const canShutdown = !["idle", "stopping"].includes(status);
+  const actions = isBusy ? [] : branchActions(status);
   const updateNote = branch.updateAvailable
     ? `<div class="muted">Update available: ${escapeHtml(branch.remoteShortCommit)}</div>`
     : branch.remoteDeleted
@@ -157,13 +154,38 @@ function renderBranch(app: AppSnapshot, branch: BranchSnapshot): string {
         ${branch.url ? `<a class="play-link" href="${escapeAttribute(branch.url)}" target="_blank" rel="noreferrer"><span>Open app</span> ↗</a>` : `<span class="muted">No active URL</span>`}
       </div>
       <div class="actions">
-        <button class="button primary" type="button" data-action="launch" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" ${disabled(isBusy || !canLaunch)}>Launch</button>
-        <button class="button secondary" type="button" data-action="pause" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" ${disabled(isBusy || !canPause)}>Pause</button>
-        <button class="button secondary" type="button" data-action="resume" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" ${disabled(isBusy || !canResume)}>Resume</button>
-        <button class="button danger" type="button" data-action="shutdown" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" ${disabled(isBusy || !canShutdown)}>Stop</button>
+        ${actions.map((action) => renderActionButton(app, branch, action)).join("")}
       </div>
       ${branch.error ? `<pre class="error-box">${escapeHtml(branch.error)}</pre>` : ""}
     </div>
+  `;
+}
+
+function branchActions(status: string): BranchAction[] {
+  if (["idle", "error"].includes(status)) {
+    return ["launch", ...(status === "error" ? ["shutdown" as const] : [])];
+  }
+  if (status === "running") {
+    return ["pause", "shutdown"];
+  }
+  if (status === "paused") {
+    return ["resume", "shutdown"];
+  }
+  return [];
+}
+
+function renderActionButton(
+  app: AppSnapshot,
+  branch: BranchSnapshot,
+  action: BranchAction
+): string {
+  const label = actionLabel(action);
+  const tone = action === "shutdown" ? "danger" : action === "launch" ? "primary" : "secondary";
+
+  return `
+    <button class="icon-button ${tone}" type="button" data-action="${escapeAttribute(action)}" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(label)}">
+      <span class="icon ${escapeAttribute(actionIcon(action))}" aria-hidden="true"></span>
+    </button>
   `;
 }
 
@@ -182,8 +204,29 @@ function labelStatus(status: string): string {
   return status;
 }
 
-function disabled(value: boolean): string {
-  return value ? "disabled" : "";
+type BranchAction = "launch" | "pause" | "resume" | "shutdown";
+
+function actionIcon(action: BranchAction): string {
+  if (action === "pause") {
+    return "pause-icon";
+  }
+  if (action === "shutdown") {
+    return "stop-icon";
+  }
+  return "play-icon";
+}
+
+function actionLabel(action: BranchAction): string {
+  if (action === "launch") {
+    return "Launch";
+  }
+  if (action === "pause") {
+    return "Pause";
+  }
+  if (action === "resume") {
+    return "Resume";
+  }
+  return "Stop";
 }
 
 async function readJson(response: Response): Promise<unknown> {
