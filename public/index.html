@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>vrunner</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">local app launcher</p>
+          <h1>vrunner</h1>
+          <p class="lede">Run, pause, and keep branch demos fresh from one small control room.</p>
+        </div>
+        <div class="hero-actions">
+          <button id="refresh" class="button secondary" type="button">Refresh</button>
+          <span id="last-updated" class="timestamp">Starting...</span>
+        </div>
+      </header>
+
+      <section id="notice" class="notice hidden" role="status"></section>
+      <section id="apps" class="apps" aria-live="polite"></section>
+    </main>
+
+    <template id="empty-template">
+      <section class="empty">
+        <p>No branches discovered yet.</p>
+        <button class="button secondary" type="button" data-action="refresh">Fetch branches</button>
+      </section>
+    </template>
+
+    <script src="/assets/app.js" type="module"></script>
+  </body>
+</html>

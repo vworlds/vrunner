@@ -1,0 +1,50 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 5050,
+    "publicHost": "localhost"
+  },
+  "poll": {
+    "intervalSeconds": 45
+  },
+  "ports": {
+    "tcp": {
+      "start": 18000,
+      "end": 18999
+    },
+    "udp": {
+      "start": 19000,
+      "end": 19999
+    }
+  },
+  "apps": [
+    {
+      "id": "vecs",
+      "name": "vecs demo",
+      "repo": "git@github.com:vworlds/vecs.git",
+      "composeFile": "ci/docker-compose.yaml",
+      "env": {
+        "VECS_HOST": "localhost",
+        "VECS_WEBRTC_UDP_HOST": "localhost",
+        "VECS_PROTOCOL": "http",
+        "VECS_WORLD_NAME": "main",
+        "VECS_API_BASE_PATH": ""
+      },
+      "ports": [
+        {
+          "env": "VECS_PORT",
+          "protocol": "tcp"
+        },
+        {
+          "env": "VECS_CLIENT_PORT",
+          "protocol": "tcp",
+          "url": true
+        },
+        {
+          "env": "VECS_WEBRTC_UDP_PORT",
+          "protocol": "udp"
+        }
+      ]
+    }
+  ]
+}
