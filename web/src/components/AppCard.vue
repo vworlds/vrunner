@@ -9,7 +9,7 @@ const props = defineProps<{
   busy: Set<string>;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   action: [action: string, appId: string, branch: string];
 }>();
 
@@ -20,6 +20,10 @@ const initial = computed(() => props.app.name.slice(0, 1).toLowerCase());
 const hasUpdates = computed(() =>
   props.app.branches.some((b) => b.updateAvailable || b.remoteDeleted)
 );
+
+function forwardAction(action: string, appId: string, branch: string): void {
+  emit("action", action, appId, branch);
+}
 </script>
 
 <template>
@@ -48,7 +52,7 @@ const hasUpdates = computed(() =>
         :app-id="app.id"
         :branch="branch"
         :busy="busy"
-        @action="$emit('action', $event[0], $event[1], $event[2])"
+        @action="forwardAction"
       />
       <div v-if="!app.branches.length" class="no-branches">
         <p>No branches discovered yet.</p>
