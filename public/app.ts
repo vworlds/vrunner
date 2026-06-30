@@ -135,7 +135,7 @@ function renderBranch(app: AppSnapshot, branch: BranchSnapshot): string {
   const status = branch.status ?? "idle";
   const key = `${app.id}:${branch.name}`;
   const isBusy = busy.has(key) || isTransient(status);
-  const actions = isBusy ? [] : branchActions(status);
+  const controls = branchControls(status, isBusy);
   const updateNote = branch.updateAvailable
     ? `<div class="muted">Update available: ${escapeHtml(branch.remoteShortCommit)}</div>`
     : branch.remoteDeleted
@@ -150,42 +150,65 @@ function renderBranch(app: AppSnapshot, branch: BranchSnapshot): string {
       </div>
       <div class="sha">${escapeHtml(branch.shortCommit || "--------")}</div>
       <div><span class="status ${escapeHtml(status)}">${escapeHtml(labelStatus(status))}</span></div>
-      <div class="link-slot">
-        ${branch.url ? `<a class="play-link" href="${escapeAttribute(branch.url)}" target="_blank" rel="noreferrer"><span>Open app</span> ↗</a>` : `<span class="muted">No active URL</span>`}
-      </div>
       <div class="actions">
-        ${actions.map((action) => renderActionButton(app, branch, action)).join("")}
+        ${controls.map((control) => renderActionButton(app, branch, control)).join("")}
+        ${renderOpenButton(branch)}
       </div>
       ${branch.error ? `<pre class="error-box">${escapeHtml(branch.error)}</pre>` : ""}
     </div>
   `;
 }
 
-function branchActions(status: string): BranchAction[] {
-  if (["idle", "error"].includes(status)) {
-    return ["launch", ...(status === "error" ? ["shutdown" as const] : [])];
-  }
+function branchControls(status: string, isBusy: boolean): BranchControl[] {
+  const primaryAction = primaryBranchAction(status);
+
+  return [
+    {
+      action: primaryAction,
+      disabled: isBusy,
+    },
+    {
+      action: "shutdown",
+      disabled: isBusy || status === "idle",
+    },
+  ];
+}
+
+function primaryBranchAction(status: string): BranchAction {
   if (status === "running") {
-    return ["pause", "shutdown"];
+    return "pause";
   }
   if (status === "paused") {
-    return ["resume", "shutdown"];
+    return "resume";
   }
-  return [];
+  return "launch";
 }
 
 function renderActionButton(
   app: AppSnapshot,
   branch: BranchSnapshot,
-  action: BranchAction
+  control: BranchControl
 ): string {
+  const action = control.action;
   const label = actionLabel(action);
   const tone = action === "shutdown" ? "danger" : action === "launch" ? "primary" : "secondary";
 
   return `
-    <button class="icon-button ${tone}" type="button" data-action="${escapeAttribute(action)}" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(label)}">
+    <button class="icon-button ${tone}" type="button" data-action="${escapeAttribute(action)}" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(label)}" ${disabled(control.disabled)}>
       <i class="fa-solid ${escapeAttribute(actionIcon(action))}" aria-hidden="true"></i>
     </button>
+  `;
+}
+
+function renderOpenButton(branch: BranchSnapshot): string {
+  if (branch.status !== "running" || !branch.url) {
+    return "";
+  }
+
+  return `
+    <a class="icon-button link" href="${escapeAttribute(branch.url)}" target="_blank" rel="noreferrer" aria-label="Open app" title="Open app">
+      <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+    </a>
   `;
 }
 
@@ -205,6 +228,15 @@ function labelStatus(status: string): string {
 }
 
 type BranchAction = "launch" | "pause" | "resume" | "shutdown";
+
+interface BranchControl {
+  action: BranchAction;
+  disabled: boolean;
+}
+
+function disabled(value: boolean): string {
+  return value ? "disabled" : "";
+}
 
 function actionIcon(action: BranchAction): string {
   if (action === "pause") {
