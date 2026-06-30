@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "naive-ui": {
+      "source": "Sepush/naive-ui-skills",
+      "sourceType": "github",
+      "skillPath": "skills/naive-ui/SKILL.md",
+      "computedHash": "61d1df9c0dea891a38cc26edd32af138ff6450de2dfca27bc8deb34ca41961e4"
+    }
+  }
+}
