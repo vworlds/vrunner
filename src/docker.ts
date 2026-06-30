@@ -22,7 +22,11 @@ export class DockerService {
     return path.join(this.gitService.worktreePath(app, branch), app.composeFile);
   }
 
-  async writeEnvFile(app: AppConfig, branch: string, ports: Record<string, number>): Promise<string> {
+  async writeEnvFile(
+    app: AppConfig,
+    branch: string,
+    ports: Record<string, number>
+  ): Promise<string> {
     const env: Record<string, string> = { ...app.env };
     for (const [key, value] of Object.entries(ports)) {
       env[key] = String(value);
@@ -45,38 +49,44 @@ export class DockerService {
       "-f",
       this.composeFilePath(app, branch),
       "-p",
-      this.projectName(app, branch)
+      this.projectName(app, branch),
     ];
   }
 
   async up(app: AppConfig, branch: string) {
-    return run("docker", [...this.composeArgs(app, branch), "up", "-d", "--build", "--remove-orphans"], {
-      cwd: this.gitService.worktreePath(app, branch)
-    });
+    return run(
+      "docker",
+      [...this.composeArgs(app, branch), "up", "-d", "--build", "--remove-orphans"],
+      {
+        cwd: this.gitService.worktreePath(app, branch),
+      }
+    );
   }
 
   async stop(app: AppConfig, branch: string) {
     return run("docker", [...this.composeArgs(app, branch), "stop"], {
-      cwd: this.gitService.worktreePath(app, branch)
+      cwd: this.gitService.worktreePath(app, branch),
     });
   }
 
   async down(app: AppConfig, branch: string) {
     return run("docker", [...this.composeArgs(app, branch), "down", "--remove-orphans"], {
-      cwd: this.gitService.worktreePath(app, branch)
+      cwd: this.gitService.worktreePath(app, branch),
     });
   }
 
   async logs(app: AppConfig, branch: string) {
     return run("docker", [...this.composeArgs(app, branch), "logs", "--tail", "200"], {
       cwd: this.gitService.worktreePath(app, branch),
-      maxBuffer: 1024 * 1024 * 10
+      maxBuffer: 1024 * 1024 * 10,
     });
   }
 }
 
 function escapeEnvValue(value: unknown): string {
   const stringValue = String(value ?? "");
-  if (/^[A-Za-z0-9_./:-]*$/.test(stringValue)) return stringValue;
+  if (/^[A-Za-z0-9_./:-]*$/.test(stringValue)) {
+    return stringValue;
+  }
   return JSON.stringify(stringValue);
 }

@@ -6,6 +6,8 @@ Local branch runner for Docker Compose app demos.
 
 ## Quick Start
 
+Use Node.js 24 or newer and npm 11.12.1, matching the vecs repo toolchain.
+
 ```sh
 npm install
 npm start
@@ -26,6 +28,9 @@ Ports are assigned from the configured pools and injected as environment variabl
 ```sh
 npm run dev     # TypeScript dev server, rebuilds browser TS first
 npm run build   # Compile backend TS and browser TS
+npm run lint    # ESLint
+npm run test    # Vitest
+npm run typecheck
 npm run serve   # Run the compiled server without rebuilding
 ```
 

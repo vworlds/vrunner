@@ -3,13 +3,7 @@ import path from "node:path";
 import { atomicWriteJson, ensureDir } from "./utils.js";
 
 export type InstanceStatus =
-  | "starting"
-  | "running"
-  | "pausing"
-  | "paused"
-  | "updating"
-  | "stopping"
-  | "error";
+  "starting" | "running" | "pausing" | "paused" | "updating" | "stopping" | "error";
 
 export interface LastCommand {
   command: string;
@@ -55,7 +49,9 @@ export class StateStore {
       const raw = await readFile(this.filePath, "utf8");
       this.state = { instances: {}, ...(JSON.parse(raw) as Partial<PersistedState>) };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
       await this.save();
     }
   }
@@ -75,14 +71,19 @@ export class StateStore {
   async setInstance(key: string, value: InstanceState): Promise<void> {
     this.state.instances[key] = {
       ...value,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     await this.save();
   }
 
-  async patchInstance(key: string, patch: Partial<InstanceState>): Promise<InstanceState | undefined> {
+  async patchInstance(
+    key: string,
+    patch: Partial<InstanceState>
+  ): Promise<InstanceState | undefined> {
     const current = this.state.instances[key];
-    if (!current) return undefined;
+    if (!current) {
+      return undefined;
+    }
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
     this.state.instances[key] = next;
     await this.save();

@@ -70,7 +70,9 @@ app.post("/api/apps/:appId/shutdown", async (req, res, next) => {
 app.get("/api/apps/:appId/logs", async (req, res, next) => {
   try {
     const branch = req.query.branch;
-    if (!branch || typeof branch !== "string") throw new Error("branch query parameter is required");
+    if (!branch || typeof branch !== "string") {
+      throw new Error("branch query parameter is required");
+    }
     const logs = await runtime.logs(req.params.appId, branch);
     res.type("text/plain").send(logs);
   } catch (error) {
@@ -78,9 +80,11 @@ app.get("/api/apps/:appId/logs", async (req, res, next) => {
   }
 });
 
-app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
-});
+app.use(
+  (error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+);
 
 app.listen(config.server.port, config.server.host, () => {
   console.log(`vrunner listening on http://${config.server.host}:${config.server.port}`);

@@ -70,7 +70,7 @@ export function run(
       {
         cwd: options.cwd,
         env: { ...process.env, ...(options.env ?? {}) },
-        maxBuffer: options.maxBuffer ?? 1024 * 1024 * 20
+        maxBuffer: options.maxBuffer ?? 1024 * 1024 * 20,
       },
       (error, stdout, stderr) => {
         const result: RunResult = {
@@ -79,7 +79,7 @@ export function run(
           cwd: options.cwd,
           stdout: stdout.trim(),
           stderr: stderr.trim(),
-          durationMs: Date.now() - startedAt
+          durationMs: Date.now() - startedAt,
         };
 
         if (error) {
@@ -97,7 +97,9 @@ export function run(
 export function errorMessage(error: unknown): string {
   const commandError = error as CommandError;
   const result = commandError?.result;
-  if (!result) return error instanceof Error ? error.message : String(error);
+  if (!result) {
+    return error instanceof Error ? error.message : String(error);
+  }
   const details = [result.stderr, result.stdout].filter(Boolean).join("\n");
   return details || commandError.message || `${result.command} failed`;
 }

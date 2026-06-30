@@ -41,7 +41,7 @@ export class GitService {
       this.repoPath(app),
       "for-each-ref",
       "--format=%(refname:short)%09%(objectname)",
-      "refs/heads"
+      "refs/heads",
     ]);
 
     return result.stdout
@@ -56,7 +56,12 @@ export class GitService {
 
   async branchCommit(app: AppConfig, branch: string): Promise<string> {
     await this.ensureRepo(app);
-    const result = await run("git", ["--git-dir", this.repoPath(app), "rev-parse", `refs/heads/${branch}`]);
+    const result = await run("git", [
+      "--git-dir",
+      this.repoPath(app),
+      "rev-parse",
+      `refs/heads/${branch}`,
+    ]);
     return result.stdout.trim();
   }
 
@@ -65,7 +70,15 @@ export class GitService {
     await removePath(worktreePath);
     await run("git", ["--git-dir", this.repoPath(app), "worktree", "prune"]);
     await ensureDir(path.dirname(worktreePath));
-    await run("git", ["--git-dir", this.repoPath(app), "worktree", "add", "--detach", worktreePath, commit]);
+    await run("git", [
+      "--git-dir",
+      this.repoPath(app),
+      "worktree",
+      "add",
+      "--detach",
+      worktreePath,
+      commit,
+    ]);
     return worktreePath;
   }
 

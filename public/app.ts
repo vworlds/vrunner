@@ -32,11 +32,17 @@ const busy = new Set<string>();
 refreshEl.addEventListener("click", () => refresh(true));
 document.addEventListener("click", async (event: MouseEvent) => {
   const target = event.target;
-  if (!(target instanceof Element)) return;
+  if (!(target instanceof Element)) {
+    return;
+  }
   const button = target.closest<HTMLButtonElement>("[data-action]");
-  if (!button) return;
+  if (!button) {
+    return;
+  }
   const action = button.dataset.action;
-  if (!action) return;
+  if (!action) {
+    return;
+  }
   if (action === "refresh") {
     await refresh(true);
     return;
@@ -44,7 +50,9 @@ document.addEventListener("click", async (event: MouseEvent) => {
 
   const appId = button.dataset.appId;
   const branch = button.dataset.branch;
-  if (!appId || !branch) return;
+  if (!appId || !branch) {
+    return;
+  }
   await runAction(action, appId, branch);
 });
 
@@ -55,7 +63,7 @@ async function refresh(forceRemote: boolean): Promise<void> {
   try {
     showNotice("");
     const response = await fetch(forceRemote ? "/api/refresh" : "/api/apps", {
-      method: forceRemote ? "POST" : "GET"
+      method: forceRemote ? "POST" : "GET",
     });
     snapshot = (await readJson(response)) as Snapshot;
     render();
@@ -73,7 +81,7 @@ async function runAction(action: string, appId: string, branch: string): Promise
     const response = await fetch(`/api/apps/${encodeURIComponent(appId)}/${action}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ branch })
+      body: JSON.stringify({ branch }),
     });
     await readJson(response);
     await refresh(false);
@@ -168,7 +176,9 @@ function isTransient(status: string): boolean {
 }
 
 function labelStatus(status: string): string {
-  if (status === "idle") return "ready";
+  if (status === "idle") {
+    return "ready";
+  }
   return status;
 }
 
@@ -178,7 +188,9 @@ function disabled(value: boolean): string {
 
 async function readJson(response: Response): Promise<unknown> {
   const payload = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new Error(payload.error ?? `HTTP ${response.status}`);
+  }
   return payload;
 }
 
@@ -202,7 +214,9 @@ function escapeAttribute(value: unknown): string {
 
 function mustQuery<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
-  if (!element) throw new Error(`missing element: ${selector}`);
+  if (!element) {
+    throw new Error(`missing element: ${selector}`);
+  }
   return element;
 }
 

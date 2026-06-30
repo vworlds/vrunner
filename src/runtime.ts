@@ -85,20 +85,26 @@ export class Runtime {
     const next = new Map(nextBranches.map((branch) => [branch.name, branch.commit]));
 
     for (const instance of Object.values(this.stateStore.instances)) {
-      if (instance.appId !== app.id) continue;
+      if (instance.appId !== app.id) {
+        continue;
+      }
       const remoteCommit = next.get(instance.branch);
       const knownCommit = previous.get(instance.branch);
 
       if (!remoteCommit) {
         await this.stateStore.patchInstance(instanceKey(app.id, instance.branch), {
           remoteDeleted: true,
-          updateAvailable: false
+          updateAvailable: false,
         });
         continue;
       }
 
-      if (remoteCommit === instance.commit) continue;
-      if (knownCommit === undefined && instance.commit === remoteCommit) continue;
+      if (remoteCommit === instance.commit) {
+        continue;
+      }
+      if (knownCommit === undefined && instance.commit === remoteCommit) {
+        continue;
+      }
 
       const key = instanceKey(app.id, instance.branch);
       if (instance.status === "running") {
@@ -107,7 +113,7 @@ export class Runtime {
         await this.stateStore.patchInstance(key, {
           remoteCommit,
           updateAvailable: true,
-          remoteDeleted: false
+          remoteDeleted: false,
         });
       }
     }
@@ -118,8 +124,12 @@ export class Runtime {
     const key = instanceKey(app.id, branch);
     return this.withLock(key, async () => {
       const existing = this.stateStore.getInstance(key);
-      if (existing?.status === "running") return existing;
-      if (existing?.status === "paused") return this.resumeLocked(app, branch);
+      if (existing?.status === "running") {
+        return existing;
+      }
+      if (existing?.status === "paused") {
+        return this.resumeLocked(app, branch);
+      }
 
       await this.stateStore.setInstance(key, {
         appId: app.id,
@@ -127,7 +137,7 @@ export class Runtime {
         status: "starting",
         desiredStatus: "running",
         ports: {},
-        logs: []
+        logs: [],
       });
 
       try {
@@ -150,7 +160,7 @@ export class Runtime {
           updateAvailable: false,
           remoteDeleted: false,
           lastCommand: summarizeResult(result),
-          error: null
+          error: null,
         };
         await this.stateStore.setInstance(key, next);
         return next;
@@ -167,7 +177,9 @@ export class Runtime {
     const key = instanceKey(app.id, branch);
     return this.withLock(key, async () => {
       const instance = this.requireInstance(key);
-      if (instance.status === "paused") return instance;
+      if (instance.status === "paused") {
+        return instance;
+      }
       await this.stateStore.patchInstance(key, { status: "pausing" });
       try {
         const result = await this.docker.stop(app, branch);
@@ -175,7 +187,7 @@ export class Runtime {
           status: "paused",
           desiredStatus: "paused",
           lastCommand: summarizeResult(result),
-          error: null
+          error: null,
         });
       } catch (error) {
         const message = errorMessage(error);
@@ -194,7 +206,9 @@ export class Runtime {
   private async resumeLocked(app: AppConfig, branch: string): Promise<InstanceState> {
     const key = instanceKey(app.id, branch);
     const instance = this.requireInstance(key);
-    if (instance.status === "running") return instance;
+    if (instance.status === "running") {
+      return instance;
+    }
     await this.stateStore.patchInstance(key, { status: "starting", desiredStatus: "running" });
     try {
       await this.git.fetch(app);
@@ -213,7 +227,7 @@ export class Runtime {
         updateAvailable: false,
         remoteDeleted: false,
         lastCommand: summarizeResult(result),
-        error: null
+        error: null,
       });
     } catch (error) {
       const message = errorMessage(error);
@@ -264,7 +278,7 @@ export class Runtime {
         updateAvailable: false,
         remoteDeleted: false,
         lastCommand: summarizeResult(result),
-        error: null
+        error: null,
       });
     } catch (error) {
       const message = errorMessage(error);
@@ -289,21 +303,26 @@ export class Runtime {
             name: branch.name,
             commit: branch.commit,
             shortCommit: shortSha(branch.commit),
-            status: "idle"
-          }
+            status: "idle",
+          },
         ])
       );
 
       for (const instance of Object.values(this.stateStore.instances)) {
-        if (instance.appId !== app.id) continue;
-        const existing = branchMap.get(instance.branch) ?? { name: instance.branch, status: "idle" };
+        if (instance.appId !== app.id) {
+          continue;
+        }
+        const existing = branchMap.get(instance.branch) ?? {
+          name: instance.branch,
+          status: "idle",
+        };
         branchMap.set(instance.branch, {
           ...existing,
           ...instance,
           name: instance.branch,
           shortCommit: instance.shortCommit ?? shortSha(instance.commit ?? existing.commit),
           remoteShortCommit: shortSha(instance.remoteCommit),
-          status: instance.status
+          status: instance.status,
         });
       }
 
@@ -311,40 +330,54 @@ export class Runtime {
         id: app.id,
         name: app.name,
         repo: app.repo,
-        branches: [...branchMap.values()].sort(compareBranches)
+        branches: [...branchMap.values()].sort(compareBranches),
       };
     });
 
     return {
       apps,
       serverTime: new Date().toISOString(),
-      pollIntervalSeconds: this.config.poll.intervalSeconds
+      pollIntervalSeconds: this.config.poll.intervalSeconds,
     };
   }
 
   private findApp(appId: string): AppConfig {
     const app = this.config.apps.find((candidate) => candidate.id === appId);
-    if (!app) throw new Error(`unknown app: ${appId}`);
+    if (!app) {
+      throw new Error(`unknown app: ${appId}`);
+    }
     return app;
   }
 
   private requireInstance(key: string): InstanceState {
     const instance = this.stateStore.getInstance(key);
-    if (!instance) throw new Error(`instance is not active: ${key}`);
+    if (!instance) {
+      throw new Error(`instance is not active: ${key}`);
+    }
     return instance;
   }
 
-  private async mustPatchInstance(key: string, patch: Partial<InstanceState>): Promise<InstanceState> {
+  private async mustPatchInstance(
+    key: string,
+    patch: Partial<InstanceState>
+  ): Promise<InstanceState> {
     const instance = await this.stateStore.patchInstance(key, patch);
-    if (!instance) throw new Error(`instance is not active: ${key}`);
+    if (!instance) {
+      throw new Error(`instance is not active: ${key}`);
+    }
     return instance;
   }
 
   private instanceUrl(app: AppConfig, ports: Record<string, number>): string | null {
-    const urlPort = app.ports.find((port) => port.url) ?? app.ports.find((port) => port.protocol === "tcp");
-    if (!urlPort) return null;
+    const urlPort =
+      app.ports.find((port) => port.url) ?? app.ports.find((port) => port.protocol === "tcp");
+    if (!urlPort) {
+      return null;
+    }
     const port = ports[urlPort.env];
-    if (!port) return null;
+    if (!port) {
+      return null;
+    }
     return `${app.urlProtocol}://${this.config.server.publicHost}:${port}`;
   }
 
@@ -356,7 +389,9 @@ export class Runtime {
     try {
       return await current;
     } finally {
-      if (this.locks.get(key) === marker) this.locks.delete(key);
+      if (this.locks.get(key) === marker) {
+        this.locks.delete(key);
+      }
     }
   }
 }
@@ -367,19 +402,29 @@ function summarizeResult(result: RunResult): LastCommand {
     stdout: result.stdout.slice(-4000),
     stderr: result.stderr.slice(-4000),
     durationMs: result.durationMs,
-    at: new Date().toISOString()
+    at: new Date().toISOString(),
   };
 }
 
 function compareBranches(a: BranchSnapshot, b: BranchSnapshot): number {
   const score = (branch: BranchSnapshot) => {
-    if (branch.status === "running") return 0;
-    if (["starting", "updating", "pausing", "stopping"].includes(branch.status)) return 1;
-    if (branch.status === "paused") return 2;
-    if (branch.status === "error") return 3;
+    if (branch.status === "running") {
+      return 0;
+    }
+    if (["starting", "updating", "pausing", "stopping"].includes(branch.status)) {
+      return 1;
+    }
+    if (branch.status === "paused") {
+      return 2;
+    }
+    if (branch.status === "error") {
+      return 3;
+    }
     return 4;
   };
   const scoreDiff = score(a) - score(b);
-  if (scoreDiff) return scoreDiff;
+  if (scoreDiff) {
+    return scoreDiff;
+  }
   return a.name.localeCompare(b.name);
 }

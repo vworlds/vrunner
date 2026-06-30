@@ -77,17 +77,25 @@ export async function loadConfig(): Promise<VRunnerConfig> {
     if (!rawApp.id || !/^[a-zA-Z0-9_-]+$/.test(rawApp.id)) {
       throw new Error("each app needs an id containing only letters, numbers, _ or -");
     }
-    if (ids.has(rawApp.id)) throw new Error(`duplicate app id: ${rawApp.id}`);
+    if (ids.has(rawApp.id)) {
+      throw new Error(`duplicate app id: ${rawApp.id}`);
+    }
     ids.add(rawApp.id);
-    if (!rawApp.repo) throw new Error(`app ${rawApp.id} needs repo`);
-    if (!rawApp.composeFile) throw new Error(`app ${rawApp.id} needs composeFile`);
+    if (!rawApp.repo) {
+      throw new Error(`app ${rawApp.id} needs repo`);
+    }
+    if (!rawApp.composeFile) {
+      throw new Error(`app ${rawApp.id} needs composeFile`);
+    }
     if (!Array.isArray(rawApp.ports) || rawApp.ports.length === 0) {
       throw new Error(`app ${rawApp.id} needs ports[]`);
     }
 
     const env = rawApp.env ?? {};
     const ports = rawApp.ports.map((port): AppPortConfig => {
-      if (!port.env) throw new Error(`app ${rawApp.id} has a port without env`);
+      if (!port.env) {
+        throw new Error(`app ${rawApp.id} has a port without env`);
+      }
       const protocol = port.protocol ?? "tcp";
       if (!["tcp", "udp"].includes(protocol)) {
         throw new Error(`app ${rawApp.id} port ${port.env} has invalid protocol`);
@@ -102,7 +110,7 @@ export async function loadConfig(): Promise<VRunnerConfig> {
       composeFile: rawApp.composeFile,
       env,
       ports,
-      urlProtocol: rawApp.urlProtocol ?? env.VECS_PROTOCOL ?? "http"
+      urlProtocol: rawApp.urlProtocol ?? env.VECS_PROTOCOL ?? "http",
     };
   });
 
@@ -113,16 +121,16 @@ export async function loadConfig(): Promise<VRunnerConfig> {
       host: "127.0.0.1",
       port: 5050,
       publicHost: "localhost",
-      ...(raw.server ?? {})
+      ...(raw.server ?? {}),
     },
     poll: {
       intervalSeconds: 45,
-      ...(raw.poll ?? {})
+      ...(raw.poll ?? {}),
     },
     ports: {
       tcp: { start: 18000, end: 18999, ...(raw.ports?.tcp ?? {}) },
-      udp: { start: 19000, end: 19999, ...(raw.ports?.udp ?? {}) }
+      udp: { start: 19000, end: 19999, ...(raw.ports?.udp ?? {}) },
     },
-    apps
+    apps,
   };
 }

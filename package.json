@@ -3,16 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.12.1",
   "description": "Local branch runner for app docker-compose demos.",
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json",
     "build:client": "tsc -p tsconfig.client.json",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
+    "lint": "eslint .",
+    "prepare": "husky",
     "start": "npm run build && node dist/server.js",
     "serve": "node dist/server.js",
-    "dev": "npm run build:client && tsx watch src/server.ts"
+    "dev": "npm run build:client && tsx watch src/server.ts",
+    "test": "vitest run \"tests/**/*.test.ts\" --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "dependencies": {
     "express": "^5.1.0"
@@ -20,7 +27,33 @@
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
+    "eslint": "^10.2.1",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "5.4.5",
+    "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
+    "eslint": "^10.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
+    "typescript": "5.4.5",
+    "vitest": "^4.1.9"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{js,jsx,mjs,cjs,json,jsonc,yml,yaml,md,html,css,scss,svg}": "prettier --write"
   }
 }
