@@ -17,6 +17,7 @@ Use this structure for repo-specific agent instructions:
   rules/
     commits.md
     documentation.md
+    frontend.md
     formatting.md
     testing.md
   workflows/
@@ -27,6 +28,7 @@ Put durable rules in `.agents/rules/`:
 
 - Commit message format and commit policy: `rules/commits.md`.
 - Documentation requirements and doc style: `rules/documentation.md`.
+- Frontend Vue and naive-ui rules: `rules/frontend.md`.
 - Formatting, linting, hooks, and CI checks: `rules/formatting.md`.
 - Test requirements, test locations, and assertion standards: `rules/testing.md`.
 
@@ -38,6 +40,7 @@ Keep `AGENTS.md` as the short routing index. Put detailed instructions here inst
 
 - Add or update commit rules in `rules/commits.md`.
 - Add or update documentation rules in `rules/documentation.md`.
+- Add or update frontend Vue and naive-ui rules in `rules/frontend.md`.
 - Add or update formatting, linting, hook, or CI rules in `rules/formatting.md`.
 - Add or update test rules in `rules/testing.md`.
 - Add task-specific procedures in `workflows/`.
