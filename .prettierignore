@@ -1,5 +1,5 @@
 .tmp/
 data/
 dist/
-public/assets/
 node_modules/
+web/public/

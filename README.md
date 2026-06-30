@@ -26,12 +26,15 @@ Ports are assigned from the configured pools and injected as environment variabl
 ## Commands
 
 ```sh
-npm run dev     # TypeScript dev server, rebuilds browser TS first
-npm run build   # Compile backend TS and browser TS
-npm run lint    # ESLint
-npm run test    # Vitest
-npm run typecheck
-npm run serve   # Run the compiled server without rebuilding
+npm run dev       # TypeScript dev server with hot reload
+npm run dev:web   # Vite dev server for the frontend (proxy to backend on :5050)
+npm run build     # Build the Vue frontend and compile the backend
+npm run lint      # ESLint
+npm run test      # Vitest
+npm run typecheck # vue-tsc and tsc
+npm run serve     # Run the compiled server without rebuilding
 ```
+
+The frontend is a Vue 3 + naive-ui single-page app. Source lives in `web/`, Vite builds it to `dist/public/`, and Express serves that directory. Run `npm run dev:web` alongside `npm run dev` for frontend hot module replacement during development.
 
 Runtime data lives in `./data/` and is ignored by git.

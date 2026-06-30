@@ -20,7 +20,7 @@ app.use(
   "/vendor/fontawesome",
   express.static(path.join(__dirname, "..", "node_modules", "@fortawesome", "fontawesome-free"))
 );
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(express.static(path.join(__dirname, "..", "dist", "public")));
 
 app.get("/api/apps", (_req, res) => {
   res.json(runtime.snapshot());

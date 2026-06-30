@@ -6,38 +6,47 @@
   "packageManager": "npm@11.12.1",
   "description": "Local branch runner for app docker-compose demos.",
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json",
-    "build:client": "tsc -p tsconfig.client.json",
+    "build": "npm run build:web && tsc -p tsconfig.json",
+    "build:web": "vue-tsc -p web/tsconfig.json --noEmit && vite build",
+    "dev:web": "vite",
+    "dev:server": "tsx watch src/server.ts",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
     "lint": "eslint .",
     "prepare": "husky",
     "start": "npm run build && node dist/server.js",
     "serve": "node dist/server.js",
-    "dev": "npm run build:client && tsx watch src/server.ts",
+    "dev": "concurrently -k -n server,web -c green,cyan \"npm:dev:server\" \"npm:dev:web\"",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
+    "typecheck": "vue-tsc -p web/tsconfig.json --noEmit && tsc -p tsconfig.json --noEmit"
   },
   "engines": {
     "node": ">=24"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.0",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "naive-ui": "^2.44.1",
+    "vue": "^3.5.39"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.59.1",
     "@typescript-eslint/parser": "^8.59.1",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "concurrently": "^10.0.3",
     "eslint": "^10.2.1",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "eslint-plugin-vue": "^10.9.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
     "tsx": "^4.20.3",
     "typescript": "5.4.5",
-    "vitest": "^4.1.9"
+    "vite": "^7.3.6",
+    "vitest": "^4.1.9",
+    "vue-tsc": "^2.2.12"
   },
   "overrides": {
     "@types/node": "^24.0.0",
@@ -51,7 +60,7 @@
     "vitest": "^4.1.9"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
+    "*.{ts,tsx,vue}": [
       "prettier --write",
       "eslint --fix"
     ],
