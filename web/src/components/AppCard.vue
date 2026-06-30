@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { NCard, NTag } from "naive-ui";
+import { NAvatar, NBadge, NCard, NEllipsis, NTag } from "naive-ui";
 import type { AppSnapshot } from "../api";
 import BranchRow from "./BranchRow.vue";
 
@@ -17,20 +17,29 @@ const branchCount = computed(
   () => `${props.app.branches.length} branch${props.app.branches.length === 1 ? "" : "es"}`
 );
 const initial = computed(() => props.app.name.slice(0, 1).toLowerCase());
+const hasUpdates = computed(() =>
+  props.app.branches.some((b) => b.updateAvailable || b.remoteDeleted)
+);
 </script>
 
 <template>
   <n-card class="app-card" :bordered="true" size="large">
-    <header class="app-header">
+    <template #header>
       <div class="app-title">
-        <div class="app-mark">{{ initial }}</div>
-        <div>
-          <h2>{{ app.name }}</h2>
-          <p class="repo" :title="app.repo">{{ app.repo }}</p>
+        <n-badge dot :show="hasUpdates" color="#e35d2f" :offset="[-4, 4]">
+          <n-avatar round :size="42" color="#17130d">{{ initial }}</n-avatar>
+        </n-badge>
+        <div class="app-info">
+          <span class="app-name">{{ app.name }}</span>
+          <n-ellipsis :line-clamp="1" class="repo">
+            {{ app.repo }}
+          </n-ellipsis>
         </div>
       </div>
+    </template>
+    <template #header-extra>
       <n-tag :bordered="false" type="default" size="small">{{ branchCount }}</n-tag>
-    </header>
+    </template>
 
     <div class="branch-list">
       <BranchRow
@@ -54,47 +63,35 @@ const initial = computed(() => props.app.name.slice(0, 1).toLowerCase());
   backdrop-filter: blur(16px);
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
 .app-title {
   display: flex;
   align-items: center;
   gap: 14px;
 }
 
-.app-mark {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: 14px;
-  color: #fff8ed;
-  background: #17130d;
-  font-weight: 900;
-  letter-spacing: -0.08em;
+.app-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
 }
 
-h2 {
-  margin: 0;
+.app-name {
+  display: block;
+  min-width: 0;
   font-size: 24px;
+  font-weight: 700;
+  line-height: 1.08;
   letter-spacing: -0.04em;
 }
 
 .repo {
+  display: block;
   max-width: 520px;
-  overflow: hidden;
-  margin: 4px 0 0;
   color: #776e60;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .branch-list {
@@ -108,7 +105,7 @@ h2 {
 }
 
 @media (max-width: 860px) {
-  .app-header {
+  .app-title {
     align-items: start;
     flex-direction: column;
   }

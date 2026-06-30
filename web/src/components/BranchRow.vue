@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { NTag } from "naive-ui";
+import { NButton, NEllipsis, NFlex, NLog, NPopover, NPopconfirm, NTag, NTooltip } from "naive-ui";
 import type { BranchSnapshot } from "../api";
 
 type BranchAction = "launch" | "pause" | "resume" | "shutdown";
@@ -50,6 +50,7 @@ const canShutdown = computed(() => !isBusy.value && status.value !== "idle");
 const canOpen = computed(() => status.value === "running" && !!props.branch.url);
 const primaryIcon = computed(() => actionIcon(primaryAction.value));
 const primaryLabel = computed(() => actionLabel(primaryAction.value));
+const errorLines = computed(() => (props.branch.error ?? "").split("\n"));
 
 function isTransient(value: string): boolean {
   return ["starting", "updating", "pausing", "stopping"].includes(value);
@@ -89,8 +90,10 @@ function emitShutdown(): void {
 
 <template>
   <div class="branch-row">
-    <div class="branch-name" :title="branch.name">
-      <span>{{ branch.name }}</span>
+    <div class="branch-name">
+      <n-ellipsis :line-clamp="1" :tooltip="{ placement: 'top' }">
+        {{ branch.name }}
+      </n-ellipsis>
       <div v-if="branch.updateAvailable" class="muted">
         Update available: {{ branch.remoteShortCommit }}
       </div>
@@ -105,48 +108,79 @@ function emitShutdown(): void {
       </n-tag>
     </div>
 
-    <div class="actions">
-      <button
-        class="icon-button primary"
-        type="button"
-        :disabled="isBusy"
-        :aria-label="primaryLabel"
-        :title="primaryLabel"
-        @click="emitPrimary"
-      >
-        <i class="fa-solid" :class="primaryIcon" aria-hidden="true"></i>
-      </button>
-      <button
-        class="icon-button danger"
-        type="button"
-        :disabled="!canShutdown"
-        aria-label="Stop"
-        title="Stop"
-        @click="emitShutdown"
-      >
-        <i class="fa-solid fa-stop" aria-hidden="true"></i>
-      </button>
-      <a
-        v-if="canOpen"
-        class="icon-button link"
-        :href="branch.url!"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Open app"
-        title="Open app"
-      >
-        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </a>
-    </div>
+    <n-flex :gap="8" justify="end" align="center" class="actions">
+      <n-tooltip>
+        <template #trigger>
+          <n-button
+            circle
+            size="medium"
+            type="primary"
+            secondary
+            :disabled="isBusy"
+            :loading="isBusy"
+            @click="emitPrimary"
+          >
+            <template #icon>
+              <span class="action-icon" aria-hidden="true">
+                <i class="fa-solid" :class="primaryIcon"></i>
+              </span>
+            </template>
+          </n-button>
+        </template>
+        {{ primaryLabel }}
+      </n-tooltip>
 
-    <pre v-if="branch.error" class="error-box">{{ branch.error }}</pre>
+      <n-popconfirm @positive-click="emitShutdown">
+        <template #trigger>
+          <n-button circle size="medium" type="error" secondary :disabled="!canShutdown">
+            <template #icon>
+              <span class="action-icon" aria-hidden="true">
+                <i class="fa-solid fa-stop"></i>
+              </span>
+            </template>
+          </n-button>
+        </template>
+        Stop and remove this branch instance?
+      </n-popconfirm>
+
+      <n-tooltip v-if="canOpen">
+        <template #trigger>
+          <n-button
+            circle
+            size="medium"
+            type="success"
+            secondary
+            tag="a"
+            :href="branch.url!"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <template #icon>
+              <span class="action-icon" aria-hidden="true">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </span>
+            </template>
+          </n-button>
+        </template>
+        Open app
+      </n-tooltip>
+    </n-flex>
+
+    <n-popover v-if="branch.error" trigger="click" placement="bottom" :width="500" scrollable>
+      <template #trigger>
+        <div class="error-trigger">
+          <n-tag type="error" size="small" round :bordered="false">error</n-tag>
+        </div>
+      </template>
+      <n-log :lines="errorLines" :rows="12" trim />
+    </n-popover>
   </div>
 </template>
 
 <style scoped>
 .branch-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 112px 128px 136px;
+  grid-template-columns: minmax(180px, 1fr) 112px 128px 136px auto;
   gap: 16px;
   align-items: center;
   padding: 14px 0;
@@ -163,11 +197,9 @@ function emitShutdown(): void {
   letter-spacing: -0.02em;
 }
 
-.branch-name span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.muted {
+  color: #776e60;
+  font-size: 13px;
 }
 
 .sha {
@@ -180,83 +212,44 @@ function emitShutdown(): void {
   min-width: 0;
 }
 
-.muted {
-  color: #776e60;
-  font-size: 13px;
-}
-
 .actions {
+  min-width: 136px;
+}
+
+.action-icon {
   display: flex;
-  justify-content: end;
-  gap: 8px;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
-.icon-button {
-  display: inline-grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 0;
-  border-radius: 12px;
-  color: #fff9ef;
-  background: #17130d;
-  box-shadow: 0 8px 20px rgba(23, 19, 13, 0.12);
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    box-shadow 150ms ease,
-    opacity 150ms ease;
+.action-icon > i {
+  display: block;
+  font-size: 12px;
+  line-height: 1;
 }
 
-.icon-button:hover:not(:disabled) {
-  box-shadow: 0 12px 24px rgba(23, 19, 13, 0.16);
+.actions :deep(.n-button .n-button__icon) {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  transform: translateX(-2px);
 }
 
-.icon-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-.icon-button.primary {
-  background: #e35d2f;
-}
-
-.icon-button.danger {
-  background: #b42318;
-}
-
-.icon-button.link {
-  color: #1b7f49;
-  background: rgba(27, 127, 73, 0.12);
-  box-shadow: none;
-}
-
-.icon-button.link:hover {
-  background: rgba(27, 127, 73, 0.2);
-}
-
-.error-box {
+.error-trigger {
   grid-column: 1 / -1;
   margin-top: -4px;
-  padding: 12px 14px;
-  border: 1px solid rgba(180, 35, 24, 0.16);
-  border-radius: 14px;
-  color: #b42318;
-  background: rgba(255, 241, 238, 0.78);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
 }
 
 @media (max-width: 860px) {
   .branch-row {
     grid-template-columns: 1fr;
     gap: 10px;
-  }
-
-  .actions {
-    justify-content: start;
-    flex-wrap: wrap;
   }
 }
 </style>
