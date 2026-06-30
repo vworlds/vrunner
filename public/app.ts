@@ -184,7 +184,7 @@ function renderActionButton(
 
   return `
     <button class="icon-button ${tone}" type="button" data-action="${escapeAttribute(action)}" data-app-id="${escapeAttribute(app.id)}" data-branch="${escapeAttribute(branch.name)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(label)}">
-      <span class="icon ${escapeAttribute(actionIcon(action))}" aria-hidden="true"></span>
+      <i class="fa-solid ${escapeAttribute(actionIcon(action))}" aria-hidden="true"></i>
     </button>
   `;
 }
@@ -208,12 +208,12 @@ type BranchAction = "launch" | "pause" | "resume" | "shutdown";
 
 function actionIcon(action: BranchAction): string {
   if (action === "pause") {
-    return "pause-icon";
+    return "fa-pause";
   }
   if (action === "shutdown") {
-    return "stop-icon";
+    return "fa-stop";
   }
-  return "play-icon";
+  return "fa-play";
 }
 
 function actionLabel(action: BranchAction): string {

@@ -319,53 +319,6 @@ h1 {
   background: var(--red);
 }
 
-.icon {
-  display: block;
-  width: 16px;
-  height: 16px;
-}
-
-.play-icon {
-  width: 0;
-  height: 0;
-  margin-left: 3px;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-  border-left: 13px solid currentColor;
-}
-
-.pause-icon {
-  position: relative;
-  width: 14px;
-  height: 16px;
-}
-
-.pause-icon::before,
-.pause-icon::after {
-  position: absolute;
-  top: 0;
-  width: 5px;
-  height: 16px;
-  border-radius: 2px;
-  background: currentColor;
-  content: "";
-}
-
-.pause-icon::before {
-  left: 1px;
-}
-
-.pause-icon::after {
-  right: 1px;
-}
-
-.stop-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 2px;
-  background: currentColor;
-}
-
 .button {
   display: inline-flex;
   min-height: 38px;
