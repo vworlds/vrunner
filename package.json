@@ -15,7 +15,7 @@
     "start": "npm run build && node dist/server.js",
     "serve": "node dist/server.js",
     "dev": "npm run build:client && tsx watch src/server.ts",
-    "test": "vitest run \"tests/**/*.test.ts\" --passWithNoTests",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
   },
   "engines": {

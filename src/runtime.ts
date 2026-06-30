@@ -3,8 +3,35 @@ import type { AppConfig, VRunnerConfig } from "./config.js";
 import { DockerService } from "./docker.js";
 import { GitService, type RemoteBranch } from "./git.js";
 import { PortAllocator } from "./ports.js";
-import type { InstanceState, LastCommand, StateStore } from "./state.js";
+import type { InstanceState, InstanceStatus, LastCommand, StateStore } from "./state.js";
 import { errorMessage, instanceKey, shortSha, type RunResult } from "./utils.js";
+
+interface RuntimeGitService {
+  branchCommit(app: AppConfig, branch: string): Promise<string>;
+  fetch(app: AppConfig): Promise<void>;
+  listBranches(app: AppConfig): Promise<RemoteBranch[]>;
+  recreateWorktree(app: AppConfig, branch: string, commit: string): Promise<string>;
+  removeWorktree(app: AppConfig, branch: string): Promise<void>;
+}
+
+interface RuntimeDockerService {
+  down(app: AppConfig, branch: string): Promise<RunResult>;
+  envFilePath(app: AppConfig, branch: string): string;
+  logs(app: AppConfig, branch: string): Promise<RunResult>;
+  stop(app: AppConfig, branch: string): Promise<RunResult>;
+  up(app: AppConfig, branch: string): Promise<RunResult>;
+  writeEnvFile(app: AppConfig, branch: string, ports: Record<string, number>): Promise<string>;
+}
+
+interface RuntimePortAllocator {
+  allocate(app: AppConfig): Record<string, number>;
+}
+
+export interface RuntimeServices {
+  docker: RuntimeDockerService;
+  git: RuntimeGitService;
+  ports: RuntimePortAllocator;
+}
 
 interface BranchSnapshot {
   name: string;
@@ -33,20 +60,22 @@ interface AppSnapshot {
 }
 
 export class Runtime {
-  private readonly git: GitService;
-  private readonly docker: DockerService;
-  private readonly ports: PortAllocator;
+  private readonly docker: RuntimeDockerService;
+  private readonly git: RuntimeGitService;
+  private readonly ports: RuntimePortAllocator;
   private readonly branchCache = new Map<string, RemoteBranch[]>();
   private readonly locks = new Map<string, Promise<unknown>>();
   private pollTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly config: VRunnerConfig,
-    private readonly stateStore: StateStore
+    private readonly stateStore: StateStore,
+    services: Partial<RuntimeServices> = {}
   ) {
-    this.git = new GitService(config);
-    this.docker = new DockerService(config, this.git);
-    this.ports = new PortAllocator(config, stateStore);
+    const git = services.git ?? new GitService(config);
+    this.git = git;
+    this.docker = services.docker ?? new DockerService(config, git as GitService);
+    this.ports = services.ports ?? new PortAllocator(config, stateStore);
   }
 
   async start(): Promise<void> {
@@ -115,6 +144,8 @@ export class Runtime {
           updateAvailable: true,
           remoteDeleted: false,
         });
+      } else if (instance.status === "error" && instance.desiredStatus === "running") {
+        await this.withLock(key, () => this.retryErrored(app, instance.branch, remoteCommit));
       }
     }
   }
@@ -130,6 +161,9 @@ export class Runtime {
       if (existing?.status === "paused") {
         return this.resumeLocked(app, branch);
       }
+      if (existing?.status === "error") {
+        return this.retryErrored(app, branch, await this.latestCommit(app, branch));
+      }
 
       await this.stateStore.setInstance(key, {
         appId: app.id,
@@ -144,26 +178,7 @@ export class Runtime {
         await this.git.fetch(app);
         const commit = await this.git.branchCommit(app, branch);
         const ports = this.ports.allocate(app);
-        const url = this.instanceUrl(app, ports);
-        await this.git.recreateWorktree(app, branch, commit);
-        await this.docker.writeEnvFile(app, branch, ports);
-        const result = await this.docker.up(app, branch);
-        const next: InstanceState = {
-          appId: app.id,
-          branch,
-          status: "running",
-          desiredStatus: "running",
-          commit,
-          shortCommit: shortSha(commit),
-          ports,
-          url,
-          updateAvailable: false,
-          remoteDeleted: false,
-          lastCommand: summarizeResult(result),
-          error: null,
-        };
-        await this.stateStore.setInstance(key, next);
-        return next;
+        return await this.startInstanceAtCommit(app, branch, commit, ports, "starting");
       } catch (error) {
         const message = errorMessage(error);
         await this.stateStore.patchInstance(key, { status: "error", error: message });
@@ -214,8 +229,7 @@ export class Runtime {
       await this.git.fetch(app);
       const commit = await this.git.branchCommit(app, branch);
       if (commit !== instance.commit) {
-        await this.git.recreateWorktree(app, branch, commit);
-        await this.docker.writeEnvFile(app, branch, instance.ports);
+        return await this.startInstanceAtCommit(app, branch, commit, instance.ports, "starting");
       }
       const result = await this.docker.up(app, branch);
       return this.mustPatchInstance(key, {
@@ -266,20 +280,7 @@ export class Runtime {
     await this.stateStore.patchInstance(key, { status: "updating", remoteCommit: commit });
     try {
       await this.docker.down(app, branch);
-      await this.git.recreateWorktree(app, branch, commit);
-      await this.docker.writeEnvFile(app, branch, instance.ports);
-      const result = await this.docker.up(app, branch);
-      await this.stateStore.patchInstance(key, {
-        status: "running",
-        desiredStatus: "running",
-        commit,
-        shortCommit: shortSha(commit),
-        remoteCommit: null,
-        updateAvailable: false,
-        remoteDeleted: false,
-        lastCommand: summarizeResult(result),
-        error: null,
-      });
+      await this.startInstanceAtCommit(app, branch, commit, instance.ports, "updating");
     } catch (error) {
       const message = errorMessage(error);
       await this.stateStore.patchInstance(key, { status: "error", error: message });
@@ -381,6 +382,87 @@ export class Runtime {
     return `${app.urlProtocol}://${this.config.server.publicHost}:${port}`;
   }
 
+  private async latestCommit(app: AppConfig, branch: string): Promise<string> {
+    await this.git.fetch(app);
+    return this.git.branchCommit(app, branch);
+  }
+
+  private async retryErrored(
+    app: AppConfig,
+    branch: string,
+    commit: string
+  ): Promise<InstanceState> {
+    const key = instanceKey(app.id, branch);
+    const instance = this.requireInstance(key);
+    const ports = hasPorts(instance.ports) ? instance.ports : this.ports.allocate(app);
+
+    await this.bestEffortDown(app, branch, key);
+    return this.startInstanceAtCommit(app, branch, commit, ports, "starting");
+  }
+
+  private async startInstanceAtCommit(
+    app: AppConfig,
+    branch: string,
+    commit: string,
+    ports: Record<string, number>,
+    startingStatus: InstanceStatus
+  ): Promise<InstanceState> {
+    const key = instanceKey(app.id, branch);
+    const url = this.instanceUrl(app, ports);
+
+    await this.stateStore.patchInstance(key, {
+      status: startingStatus,
+      desiredStatus: "running",
+      commit,
+      shortCommit: shortSha(commit),
+      ports,
+      url,
+      remoteCommit: commit,
+      updateAvailable: false,
+      remoteDeleted: false,
+    });
+
+    try {
+      await this.git.recreateWorktree(app, branch, commit);
+      await this.docker.writeEnvFile(app, branch, ports);
+      const result = await this.docker.up(app, branch);
+      return await this.mustPatchInstance(key, {
+        status: "running",
+        desiredStatus: "running",
+        commit,
+        shortCommit: shortSha(commit),
+        ports,
+        url,
+        remoteCommit: null,
+        updateAvailable: false,
+        remoteDeleted: false,
+        lastCommand: summarizeResult(result),
+        error: null,
+      });
+    } catch (error) {
+      const message = errorMessage(error);
+      await this.stateStore.patchInstance(key, {
+        status: "error",
+        desiredStatus: "running",
+        commit,
+        shortCommit: shortSha(commit),
+        ports,
+        url,
+        remoteCommit: commit,
+        error: message,
+      });
+      throw new Error(message);
+    }
+  }
+
+  private async bestEffortDown(app: AppConfig, branch: string, key: string): Promise<void> {
+    try {
+      await this.docker.down(app, branch);
+    } catch (error) {
+      console.warn(`docker down failed for ${key}:`, errorMessage(error));
+    }
+  }
+
   private async withLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
     const previous = this.locks.get(key) ?? Promise.resolve();
     const current = previous.then(operation, operation);
@@ -394,6 +476,10 @@ export class Runtime {
       }
     }
   }
+}
+
+function hasPorts(ports: Record<string, number>): boolean {
+  return Object.keys(ports).length > 0;
 }
 
 function summarizeResult(result: RunResult): LastCommand {
