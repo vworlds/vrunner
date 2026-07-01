@@ -19,6 +19,7 @@ export interface InstanceState {
   status: InstanceStatus;
   desiredStatus: "running" | "paused" | "stopped";
   commit?: string;
+  committedAt?: string;
   shortCommit?: string;
   remoteCommit?: string | null;
   ports: Record<string, number>;

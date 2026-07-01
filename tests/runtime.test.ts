@@ -63,6 +63,7 @@ describe("Runtime Docker failure retry behavior", () => {
     expect(instance).toMatchObject({
       branch: "dev",
       commit: "commit-a",
+      committedAt: "2026-01-01T00:00:00.000Z",
       desiredStatus: "running",
       error: "docker build failed",
       ports: { APP_PORT: 18000 },
@@ -94,6 +95,7 @@ describe("Runtime Docker failure retry behavior", () => {
     expect(instance).toMatchObject({
       branch: "dev",
       commit: "commit-b",
+      committedAt: "2026-01-01T00:01:00.000Z",
       desiredStatus: "running",
       error: null,
       ports: { APP_PORT: 18000 },
@@ -104,6 +106,24 @@ describe("Runtime Docker failure retry behavior", () => {
     expect(docker.upCalls).toBe(1);
     expect(git.recreated).toEqual(["commit-b"]);
     expect(ports.allocateCalls).toBe(0);
+  });
+
+  test("parallel runtime instances serialize branch operations through the data lock", async () => {
+    docker.upDelayMs = 25;
+    const runtimeA = makeRuntime(config, stateStore, git, docker, ports);
+    const runtimeB = makeRuntime(config, stateStore, git, docker, ports);
+
+    await Promise.all([runtimeA.launch("vecs", "dev"), runtimeB.launch("vecs", "dev")]);
+
+    const instance = stateStore.getInstance("vecs:dev");
+    expect(instance).toMatchObject({
+      branch: "dev",
+      commit: "commit-a",
+      status: "running",
+    });
+    expect(docker.upCalls).toBe(1);
+    expect(git.recreated).toEqual(["commit-a"]);
+    expect(ports.allocateCalls).toBe(1);
   });
 });
 
@@ -130,6 +150,7 @@ function result(command: string): RunResult {
 class FakeDocker implements RuntimeDocker {
   downCalls = 0;
   failNextUp?: Error;
+  upDelayMs = 0;
   upCalls = 0;
   wroteEnvFor: string[] = [];
 
@@ -152,6 +173,7 @@ class FakeDocker implements RuntimeDocker {
 
   async up() {
     this.upCalls += 1;
+    await sleep(this.upDelayMs);
     if (this.failNextUp) {
       const error = this.failNextUp;
       this.failNextUp = undefined;
@@ -166,18 +188,30 @@ class FakeDocker implements RuntimeDocker {
   }
 }
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 class FakeGit implements RuntimeGit {
   commit = "commit-a";
+  commitDates: Record<string, string> = {
+    "commit-a": "2026-01-01T00:00:00.000Z",
+    "commit-b": "2026-01-01T00:01:00.000Z",
+  };
   recreated: string[] = [];
 
   async branchCommit() {
     return this.commit;
   }
 
+  async commitDate(_app: AppConfig, commit: string) {
+    return this.commitDates[commit] ?? "2026-01-01T00:00:00.000Z";
+  }
+
   async fetch() {}
 
   async listBranches() {
-    return [{ commit: this.commit, name: "dev" }];
+    return [{ commit: this.commit, committedAt: this.commitDates[this.commit], name: "dev" }];
   }
 
   async recreateWorktree(_app: AppConfig, _branch: string, commit: string) {

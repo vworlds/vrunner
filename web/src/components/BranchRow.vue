@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { NButton, NEllipsis, NFlex, NLog, NPopover, NPopconfirm, NTag, NTooltip } from "naive-ui";
+import {
+  NButton,
+  NEllipsis,
+  NFlex,
+  NLog,
+  NPopover,
+  NPopconfirm,
+  NTag,
+  NTime,
+  NTooltip,
+} from "naive-ui";
 import type { BranchSnapshot } from "../api";
 
 type BranchAction = "launch" | "pause" | "resume" | "shutdown";
@@ -51,6 +61,10 @@ const canOpen = computed(() => status.value === "running" && !!props.branch.url)
 const primaryIcon = computed(() => actionIcon(primaryAction.value));
 const primaryLabel = computed(() => actionLabel(primaryAction.value));
 const errorLines = computed(() => (props.branch.error ?? "").split("\n"));
+const committedDate = computed(() => parseDate(props.branch.committedAt));
+const committedAtTitle = computed(() =>
+  committedDate.value ? committedDate.value.toLocaleString() : "Commit date unavailable"
+);
 
 function isTransient(value: string): boolean {
   return ["starting", "updating", "pausing", "stopping"].includes(value);
@@ -86,6 +100,14 @@ function emitPrimary(): void {
 function emitShutdown(): void {
   emit("action", "shutdown", props.appId, props.branch.name);
 }
+
+function parseDate(value: string | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 </script>
 
 <template>
@@ -101,6 +123,22 @@ function emitShutdown(): void {
     </div>
 
     <div class="sha">{{ branch.shortCommit || "--------" }}</div>
+
+    <n-tooltip>
+      <template #trigger>
+        <div class="commit-age">
+          <n-time
+            v-if="committedDate"
+            :time="committedDate"
+            type="relative"
+            :to="Date.now()"
+            text
+          />
+          <span v-else>unknown</span>
+        </div>
+      </template>
+      {{ committedAtTitle }}
+    </n-tooltip>
 
     <div class="status-cell">
       <n-tag :type="tagType" size="small" :bordered="false" round>
@@ -180,7 +218,7 @@ function emitShutdown(): void {
 <style scoped>
 .branch-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 112px 128px 136px auto;
+  grid-template-columns: minmax(180px, 1fr) 112px 116px 128px 136px auto;
   gap: 16px;
   align-items: center;
   padding: 14px 0;
@@ -206,6 +244,14 @@ function emitShutdown(): void {
   color: #776e60;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+}
+
+.commit-age {
+  width: fit-content;
+  color: #776e60;
+  cursor: help;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .status-cell {

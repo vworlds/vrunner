@@ -13,6 +13,7 @@ export interface AppSnapshot {
 
 export interface BranchSnapshot {
   name: string;
+  committedAt?: string;
   status?: string;
   shortCommit?: string;
   remoteShortCommit?: string;

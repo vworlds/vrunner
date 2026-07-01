@@ -1,13 +1,27 @@
-import { rm } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
 import type { AppConfig, VRunnerConfig } from "./config.js";
 import { DockerService } from "./docker.js";
 import { GitService, type RemoteBranch } from "./git.js";
 import { PortAllocator } from "./ports.js";
 import type { InstanceState, InstanceStatus, LastCommand, StateStore } from "./state.js";
-import { errorMessage, instanceKey, shortSha, type RunResult } from "./utils.js";
+import {
+  ensureDir,
+  errorMessage,
+  instanceKey,
+  shortHash,
+  shortSha,
+  slugify,
+  type RunResult,
+} from "./utils.js";
+
+const LOCK_POLL_MS = 250;
+const LOCK_STALE_MS = 2 * 60 * 60 * 1000;
+const LOCK_WAIT_MS = 10 * 60 * 1000;
 
 interface RuntimeGitService {
   branchCommit(app: AppConfig, branch: string): Promise<string>;
+  commitDate(app: AppConfig, commit: string): Promise<string>;
   fetch(app: AppConfig): Promise<void>;
   listBranches(app: AppConfig): Promise<RemoteBranch[]>;
   recreateWorktree(app: AppConfig, branch: string, commit: string): Promise<string>;
@@ -36,6 +50,7 @@ export interface RuntimeServices {
 interface BranchSnapshot {
   name: string;
   commit?: string;
+  committedAt?: string;
   shortCommit?: string;
   status: string;
   remoteShortCommit?: string;
@@ -303,6 +318,7 @@ export class Runtime {
           {
             name: branch.name,
             commit: branch.commit,
+            committedAt: branch.committedAt,
             shortCommit: shortSha(branch.commit),
             status: "idle",
           },
@@ -321,6 +337,9 @@ export class Runtime {
           ...existing,
           ...instance,
           name: instance.branch,
+          committedAt:
+            instance.committedAt ??
+            (instance.commit === existing.commit ? existing.committedAt : undefined),
           shortCommit: instance.shortCommit ?? shortSha(instance.commit ?? existing.commit),
           remoteShortCommit: shortSha(instance.remoteCommit),
           status: instance.status,
@@ -409,11 +428,13 @@ export class Runtime {
   ): Promise<InstanceState> {
     const key = instanceKey(app.id, branch);
     const url = this.instanceUrl(app, ports);
+    const committedAt = await this.git.commitDate(app, commit);
 
     await this.stateStore.patchInstance(key, {
       status: startingStatus,
       desiredStatus: "running",
       commit,
+      committedAt,
       shortCommit: shortSha(commit),
       ports,
       url,
@@ -430,6 +451,7 @@ export class Runtime {
         status: "running",
         desiredStatus: "running",
         commit,
+        committedAt,
         shortCommit: shortSha(commit),
         ports,
         url,
@@ -445,6 +467,7 @@ export class Runtime {
         status: "error",
         desiredStatus: "running",
         commit,
+        committedAt,
         shortCommit: shortSha(commit),
         ports,
         url,
@@ -465,7 +488,10 @@ export class Runtime {
 
   private async withLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
     const previous = this.locks.get(key) ?? Promise.resolve();
-    const current = previous.then(operation, operation);
+    const current = previous.then(
+      () => this.withProcessLock(key, operation),
+      () => this.withProcessLock(key, operation)
+    );
     const marker = current.catch(() => undefined);
     this.locks.set(key, marker);
     try {
@@ -476,6 +502,81 @@ export class Runtime {
       }
     }
   }
+
+  private async withProcessLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+    const release = await this.acquireProcessLock(key);
+    try {
+      return await operation();
+    } finally {
+      await release();
+    }
+  }
+
+  private async acquireProcessLock(key: string): Promise<() => Promise<void>> {
+    const lockDir = path.join(
+      this.config.dataDir,
+      "locks",
+      `${slugify(key)}-${shortHash(key, 6)}.lock`
+    );
+    const startedAt = Date.now();
+
+    await ensureDir(path.dirname(lockDir));
+
+    while (true) {
+      try {
+        await mkdir(lockDir);
+        await writeFile(
+          path.join(lockDir, "owner.json"),
+          `${JSON.stringify({ acquiredAt: new Date().toISOString(), key, pid: process.pid })}\n`
+        );
+        return () => rm(lockDir, { force: true, recursive: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+          throw error;
+        }
+        if (await this.removeStaleProcessLock(lockDir)) {
+          continue;
+        }
+        if (Date.now() - startedAt > LOCK_WAIT_MS) {
+          throw new Error(`timed out waiting for branch lock: ${key}`);
+        }
+        await sleep(LOCK_POLL_MS);
+      }
+    }
+  }
+
+  private async removeStaleProcessLock(lockDir: string): Promise<boolean> {
+    const lockedAt = await lockTimestamp(lockDir);
+    if (Date.now() - lockedAt < LOCK_STALE_MS) {
+      return false;
+    }
+    await rm(lockDir, { force: true, recursive: true });
+    return true;
+  }
+}
+
+async function lockTimestamp(lockDir: string): Promise<number> {
+  try {
+    const owner = JSON.parse(await readFile(path.join(lockDir, "owner.json"), "utf8")) as {
+      acquiredAt?: string;
+    };
+    const acquiredAt = owner.acquiredAt ? Date.parse(owner.acquiredAt) : NaN;
+    if (Number.isFinite(acquiredAt)) {
+      return acquiredAt;
+    }
+  } catch {
+    // Fall back to directory mtime for partially-created locks.
+  }
+
+  try {
+    return (await stat(lockDir)).mtimeMs;
+  } catch {
+    return Date.now();
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function hasPorts(ports: Record<string, number>): boolean {

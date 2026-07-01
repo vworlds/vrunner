@@ -5,6 +5,7 @@ import { ensureDir, removePath, run, safeBranchSlug } from "./utils.js";
 export interface RemoteBranch {
   name: string;
   commit: string;
+  committedAt: string;
 }
 
 export class GitService {
@@ -40,15 +41,15 @@ export class GitService {
       "--git-dir",
       this.repoPath(app),
       "for-each-ref",
-      "--format=%(refname:short)%09%(objectname)",
+      "--format=%(refname:short)%09%(objectname)%09%(committerdate:iso8601-strict)",
       "refs/heads",
     ]);
 
     return result.stdout
       .split("\n")
       .map((line): RemoteBranch | null => {
-        const [name, commit] = line.trim().split("\t");
-        return name && commit ? { name, commit } : null;
+        const [name, commit, committedAt] = line.trim().split("\t");
+        return name && commit && committedAt ? { name, commit, committedAt } : null;
       })
       .filter((branch): branch is RemoteBranch => branch !== null)
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -61,6 +62,19 @@ export class GitService {
       this.repoPath(app),
       "rev-parse",
       `refs/heads/${branch}`,
+    ]);
+    return result.stdout.trim();
+  }
+
+  async commitDate(app: AppConfig, commit: string): Promise<string> {
+    await this.ensureRepo(app);
+    const result = await run("git", [
+      "--git-dir",
+      this.repoPath(app),
+      "show",
+      "-s",
+      "--format=%cI",
+      commit,
     ]);
     return result.stdout.trim();
   }
